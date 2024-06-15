@@ -33,6 +33,9 @@ LANGUAGES = {
 }
 
 def start(update: Update, context: CallbackContext) -> int:
+    # Réinitialiser le contexte utilisateur
+    context.user_data.clear()
+    
     reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
     update.message.reply_text(
         "Bonjour je m'appelle LM ! Je suis une intelligence artificielle de traduction des langues maternelles africaines. "
@@ -99,7 +102,8 @@ def main() -> None:
             CHOOSE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_language)],
             TRANSLATE_TEXT: [MessageHandler(Filters.text & ~Filters.command, translate_text)],
         },
-        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)]
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)],
+        allow_reentry=True  # Permettre la réentrée dans la conversation
     )
 
     # Configuration des gestionnaires de commandes et de messages
