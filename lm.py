@@ -36,20 +36,19 @@ LANGUAGES = {
 bot = Bot(token=TELEGRAM_TOKEN)
 updater = Updater(bot=bot, use_context=True)
 
-# Gestionnaire de conversation
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('start', lambda update, context: start(update, context))],
-    states={
-        CHOOSE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, lambda update, context: choose_language(update, context))],
-        TRANSLATE_TEXT: [MessageHandler(Filters.text & ~Filters.command, lambda update, context: translate_text(update, context))],
-    },
-    fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)]
-)
+# Fonction pour annuler l'opération
+def cancel(update: Update, context: CallbackContext) -> int:
+    update.message.reply_text('Opération annulée.')
+    return ConversationHandler.END
 
-# Configuration des gestionnaires de commandes et de messages
-dispatcher = updater.dispatcher
-dispatcher.add_handler(conv_handler)
-dispatcher.add_handler(CommandHandler('change_language', lambda update, context: change_language(update, context)))
+# Fonction pour changer la langue cible
+def change_language(update: Update, context: CallbackContext) -> int:
+    reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
+    update.message.reply_text(
+        "Veuillez choisir la nouvelle langue cible :",
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    )
+    return CHOOSE_LANGUAGE
 
 # Fonction pour démarrer la conversation
 def start(update: Update, context: CallbackContext) -> int:
@@ -97,20 +96,22 @@ def translate_text(update: Update, context: CallbackContext) -> int:
     update.message.reply_text(translated_text)
     return TRANSLATE_TEXT
 
-# Fonction pour changer la langue cible
-def change_language(update: Update, context: CallbackContext) -> int:
-    reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
-    update.message.reply_text(
-        "Veuillez choisir la nouvelle langue cible :",
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-    )
-    return CHOOSE_LANGUAGE
+# Gestionnaire de conversation
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler('start', start)],
+    states={
+        CHOOSE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_language)],
+        TRANSLATE_TEXT: [MessageHandler(Filters.text & ~Filters.command, translate_text)],
+    },
+    fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)]
+)
 
-# Fonction pour annuler l'opération
-def cancel(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text('Opération annulée.')
-    return ConversationHandler.END
+# Configuration des gestionnaires de commandes et de messages
+dispatcher = updater.dispatcher
+dispatcher.add_handler(conv_handler)
+dispatcher.add_handler(CommandHandler('change_language', change_language))
 
+# Fonction pour recevoir les mises à jour de Telegram via webhook
 @app.route(f'/{TELEGRAM_TOKEN}', methods=['POST'])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
