@@ -125,3 +125,4 @@ if __name__ == '__main__':
     Thread(target=main).start()
     # Lancer le serveur Flask
     app.run(host='0.0.0.0', port=5000)
+ 
