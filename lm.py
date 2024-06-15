@@ -5,6 +5,7 @@ import requests
 from flask import Flask
 import logging
 import urllib3
+from threading import Thread
 
 app = Flask(__name__)
 
@@ -91,7 +92,7 @@ def cancel(update: Update, context: CallbackContext) -> int:
 def main() -> None:
     # Augmenter la taille de la pool de connexions
     urllib3.disable_warnings()
-    bot = Bot(token=TELEGRAM_TOKEN, request_kwargs={'connection_pool_size': 10})
+    bot = Bot(token=TELEGRAM_TOKEN, request_kwargs={'connection_pool_size': 20})
     
     # Initialisation du bot Telegram
     updater = Updater(bot=bot, use_context=True)
@@ -120,7 +121,6 @@ def index():
     return "Bot Telegram est en cours d'exécution."
 
 if __name__ == '__main__':
-    from threading import Thread
     # Lancer le bot Telegram dans un thread séparé
     Thread(target=main).start()
     # Lancer le serveur Flask
