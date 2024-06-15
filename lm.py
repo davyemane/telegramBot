@@ -1,9 +1,10 @@
 import os
+from flask import Flask, request
 from telegram import Update, Bot, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
 import requests
-from flask import Flask
 import logging
+import urllib3
 
 app = Flask(__name__)
 
@@ -19,6 +20,9 @@ TELEGRAM_TOKEN = "7237609520:AAHZ_0kFz1au-nTeCYZfnJspJ6lOAqpkoNI"
 
 # URL de votre API déployée sur Render
 API_URL = "https://lm1-paxp.onrender.com/dictionnaire/translate/"
+
+# URL de votre serveur
+SERVER_URL = "https://telegrambot-1-hz5r.onrender.com"  # Remplacez par l'URL de votre serveur
 
 # États pour le gestionnaire de conversation
 CHOOSE_LANGUAGE, TRANSLATE_TEXT = range(2)
@@ -91,9 +95,12 @@ def cancel(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 def main() -> None:
-    # Initialisation du bot Telegram
+    # Augmenter la taille de la pool de connexions
+    urllib3.disable_warnings()
     bot = Bot(token=TELEGRAM_TOKEN)
-    updater = Updater(bot=bot, use_context=True)
+    
+    # Initialisation du dispatcher
+    dispatcher = Dispatcher(bot, None, use_context=True)
 
     # Gestionnaire de conversation
     conv_handler = ConversationHandler(
@@ -107,21 +114,25 @@ def main() -> None:
     )
 
     # Configuration des gestionnaires de commandes et de messages
-    dispatcher = updater.dispatcher
     dispatcher.add_handler(conv_handler)
     dispatcher.add_handler(CommandHandler('change_language', change_language))
 
-    # Démarrage du bot en mode non-bloquant
-    updater.start_polling()
-    updater.idle()
+    # Définir le webhook
+    bot.set_webhook(url=f"{SERVER_URL}/webhook/{TELEGRAM_TOKEN}")
+
+    return dispatcher
+
+@app.route(f'/webhook/{TELEGRAM_TOKEN}', methods=['POST'])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return "ok", 200
 
 @app.route('/')
 def index():
     return "Bot Telegram est en cours d'exécution."
 
 if __name__ == '__main__':
-    from threading import Thread
-    # Lancer le bot Telegram dans un thread séparé
-    Thread(target=main).start()
+    dispatcher = main()
     # Lancer le serveur Flask
     app.run(host='0.0.0.0', port=5000)
