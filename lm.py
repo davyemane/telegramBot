@@ -4,6 +4,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 import requests
 from flask import Flask
 import logging
+import urllib3
 
 app = Flask(__name__)
 
@@ -88,8 +89,11 @@ def cancel(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 def main() -> None:
+    # Augmenter la taille de la pool de connexions
+    urllib3.disable_warnings()
+    bot = Bot(token=TELEGRAM_TOKEN, request_kwargs={'connection_pool_size': 10})
+    
     # Initialisation du bot Telegram
-    bot = Bot(token=TELEGRAM_TOKEN)
     updater = Updater(bot=bot, use_context=True)
 
     # Gestionnaire de conversation
