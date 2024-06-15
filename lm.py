@@ -2,7 +2,7 @@ import os
 from telegram import Update, Bot, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
 import requests
-from flask import Flask, request
+from flask import Flask
 import logging
 
 app = Flask(__name__)
@@ -32,25 +32,6 @@ LANGUAGES = {
     # Ajoutez d'autres langues selon vos besoins
 }
 
-# Initialisation du bot Telegram
-bot = Bot(token=TELEGRAM_TOKEN)
-updater = Updater(bot=bot, use_context=True)
-
-# Fonction pour annuler l'opération
-def cancel(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text('Opération annulée.')
-    return ConversationHandler.END
-
-# Fonction pour changer la langue cible
-def change_language(update: Update, context: CallbackContext) -> int:
-    reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
-    update.message.reply_text(
-        "Veuillez choisir la nouvelle langue cible :",
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-    )
-    return CHOOSE_LANGUAGE
-
-# Fonction pour démarrer la conversation
 def start(update: Update, context: CallbackContext) -> int:
     reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
     update.message.reply_text(
@@ -61,7 +42,6 @@ def start(update: Update, context: CallbackContext) -> int:
     )
     return CHOOSE_LANGUAGE
 
-# Fonction pour choisir la langue cible
 def choose_language(update: Update, context: CallbackContext) -> int:
     target_language = update.message.text
     if target_language in LANGUAGES:
@@ -72,7 +52,6 @@ def choose_language(update: Update, context: CallbackContext) -> int:
         update.message.reply_text('Langue non reconnue. Veuillez choisir une langue de la liste.')
         return CHOOSE_LANGUAGE
 
-# Fonction pour traduire le texte
 def translate_text(update: Update, context: CallbackContext) -> int:
     if 'target_lang' not in context.user_data:
         update.message.reply_text('Veuillez d\'abord choisir une langue en utilisant /start.')
@@ -96,27 +75,49 @@ def translate_text(update: Update, context: CallbackContext) -> int:
     update.message.reply_text(translated_text)
     return TRANSLATE_TEXT
 
-# Gestionnaire de conversation
-conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('start', start)],
-    states={
-        CHOOSE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_language)],
-        TRANSLATE_TEXT: [MessageHandler(Filters.text & ~Filters.command, translate_text)],
-    },
-    fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)]
-)
+def change_language(update: Update, context: CallbackContext) -> int:
+    reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
+    update.message.reply_text(
+        "Veuillez choisir la nouvelle langue cible :",
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    )
+    return CHOOSE_LANGUAGE
 
-# Configuration des gestionnaires de commandes et de messages
-dispatcher = updater.dispatcher
-dispatcher.add_handler(conv_handler)
-dispatcher.add_handler(CommandHandler('change_language', change_language))
+def cancel(update: Update, context: CallbackContext) -> int:
+    update.message.reply_text('Opération annulée.')
+    return ConversationHandler.END
 
-# Fonction pour recevoir les mises à jour de Telegram via webhook
-@app.route(f'/{TELEGRAM_TOKEN}', methods=['POST'])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
-    return "ok"
+def main() -> None:
+    # Initialisation du bot Telegram
+    bot = Bot(token=TELEGRAM_TOKEN)
+    updater = Updater(bot=bot, use_context=True)
+
+    # Gestionnaire de conversation
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            CHOOSE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_language)],
+            TRANSLATE_TEXT: [MessageHandler(Filters.text & ~Filters.command, translate_text)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)]
+    )
+
+    # Configuration des gestionnaires de commandes et de messages
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(conv_handler)
+    dispatcher.add_handler(CommandHandler('change_language', change_language))
+
+    # Démarrage du bot en mode non-bloquant
+    updater.start_polling()
+    updater.idle()
+
+@app.route('/')
+def index():
+    return "Bot Telegram est en cours d'exécution."
 
 if __name__ == '__main__':
+    from threading import Thread
+    # Lancer le bot Telegram dans un thread séparé
+    Thread(target=main).start()
+    # Lancer le serveur Flask
     app.run(host='0.0.0.0', port=5000)
