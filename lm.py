@@ -92,7 +92,7 @@ def cancel(update: Update, context: CallbackContext) -> int:
 def main() -> None:
     # Augmenter la taille de la pool de connexions
     urllib3.disable_warnings()
-    bot = Bot(token=TELEGRAM_TOKEN, connection_pool_size= 20})
+    bot = Bot(token=TELEGRAM_TOKEN, connection_pool_size= 20)
     
     # Initialisation du bot Telegram
     updater = Updater(bot=bot, use_context=True)
