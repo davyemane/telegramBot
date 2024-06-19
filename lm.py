@@ -21,7 +21,7 @@ TELEGRAM_TOKEN = "7237609520:AAHZ_0kFz1au-nTeCYZfnJspJ6lOAqpkoNI"
 API_URL = "https://lm1-paxp.onrender.com/dictionnaire/translate/"
 
 # États pour le gestionnaire de conversation
-CHOOSE_LANGUAGE, TRANSLATE_TEXT = range(2)
+CHOOSE_SOURCE_LANGUAGE, CHOOSE_TARGET_LANGUAGE, TRANSLATE_TEXT = range(3)
 
 # Dictionnaire des langues disponibles
 LANGUAGES = {
@@ -39,32 +39,46 @@ def start(update: Update, context: CallbackContext) -> int:
     reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
     update.message.reply_text(
         "Bonjour je m'appelle LM ! Je suis une intelligence artificielle de traduction des langues maternelles africaines. "
-        "Envoyez-moi votre texte et je le traduirai dans la langue choisie.\n\n"
-        "Veuillez choisir la langue cible :",
+        "Veuillez choisir la langue source :",
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
     )
-    return CHOOSE_LANGUAGE
+    return CHOOSE_SOURCE_LANGUAGE
 
-def choose_language(update: Update, context: CallbackContext) -> int:
+def choose_source_language(update: Update, context: CallbackContext) -> int:
+    source_language = update.message.text
+    if source_language in LANGUAGES:
+        context.user_data['source_lang'] = LANGUAGES[source_language]
+        reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
+        update.message.reply_text(
+            f'Langue source choisie: {source_language}. Veuillez choisir la langue cible :',
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+        )
+        return CHOOSE_TARGET_LANGUAGE
+    else:
+        update.message.reply_text('Langue non reconnue. Veuillez choisir une langue de la liste.')
+        return CHOOSE_SOURCE_LANGUAGE
+
+def choose_target_language(update: Update, context: CallbackContext) -> int:
     target_language = update.message.text
     if target_language in LANGUAGES:
         context.user_data['target_lang'] = LANGUAGES[target_language]
-        update.message.reply_text(f'Langue choisie: {target_language}. Maintenant, envoyez-moi le texte que vous souhaitez traduire.')
+        update.message.reply_text(f'Langue cible choisie: {target_language}. Maintenant, envoyez-moi le texte que vous souhaitez traduire.')
         return TRANSLATE_TEXT
     else:
         update.message.reply_text('Langue non reconnue. Veuillez choisir une langue de la liste.')
-        return CHOOSE_LANGUAGE
+        return CHOOSE_TARGET_LANGUAGE
 
 def translate_text(update: Update, context: CallbackContext) -> int:
-    if 'target_lang' not in context.user_data:
-        update.message.reply_text('Veuillez d\'abord choisir une langue en utilisant /start.')
-        return CHOOSE_LANGUAGE
+    if 'source_lang' not in context.user_data or 'target_lang' not in context.user_data:
+        update.message.reply_text('Veuillez d\'abord choisir les langues en utilisant /start.')
+        return CHOOSE_SOURCE_LANGUAGE
 
     message = update.message.text
+    source_lang = context.user_data['source_lang']
     target_lang = context.user_data['target_lang']
     params = {
         'text': message,
-        'source_lang': 'fr',  # Vous pouvez personnaliser cette valeur
+        'source_lang': source_lang,
         'target_lang': target_lang
     }
     try:
@@ -81,10 +95,10 @@ def translate_text(update: Update, context: CallbackContext) -> int:
 def change_language(update: Update, context: CallbackContext) -> int:
     reply_keyboard = [[lang for lang in LANGUAGES.keys()]]
     update.message.reply_text(
-        "Veuillez choisir la nouvelle langue cible :",
+        "Veuillez choisir la nouvelle langue source :",
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
     )
-    return CHOOSE_LANGUAGE
+    return CHOOSE_SOURCE_LANGUAGE
 
 def cancel(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('Opération annulée.')
@@ -99,7 +113,8 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            CHOOSE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_language)],
+            CHOOSE_SOURCE_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_source_language)],
+            CHOOSE_TARGET_LANGUAGE: [MessageHandler(Filters.text & ~Filters.command, choose_target_language)],
             TRANSLATE_TEXT: [MessageHandler(Filters.text & ~Filters.command, translate_text)],
         },
         fallbacks=[CommandHandler('cancel', cancel), CommandHandler('change_language', change_language)]
@@ -125,4 +140,3 @@ if __name__ == '__main__':
     Thread(target=main).start()
     # Lancer le serveur Flask
     app.run(host='0.0.0.0', port=5000)
- 
